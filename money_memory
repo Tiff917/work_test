@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>語婕的奶茶風記帳</title>
+    <!-- PWA 必備設定 -->
+    <meta name="theme-color" content="#E6D2C3">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3256/3256165.png">
+    
+    <style>
+        :root {
+            --milk-tea: #F3E5D8;
+            --tea-brown: #A67B5B;
+            --soft-white: #FAF7F2;
+        }
+        body {
+            background-color: var(--milk-tea);
+            font-family: "PingFang TC", "Microsoft JhengHei", sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: var(--tea-brown);
+        }
+        .card {
+            background: var(--soft-white);
+            padding: 2rem;
+            border-radius: 25px;
+            box-shadow: 0 10px 20px rgba(166, 123, 91, 0.1);
+            width: 85%;
+            max-width: 350px;
+        }
+        h2 { text-align: center; margin-bottom: 1.5rem; font-weight: 400; }
+        .input-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; font-size: 0.9rem; }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--milk-tea);
+            border-radius: 10px;
+            box-sizing: border-box;
+            background: var(--soft-white);
+            color: var(--tea-brown);
+            outline: none;
+        }
+        input:focus { border-color: var(--tea-brown); }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--tea-brown);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            margin-top: 1rem;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        button:active { transform: scale(0.98); }
+        .status { text-align: center; margin-top: 1rem; font-size: 0.8rem; height: 1.2rem; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>☕ 記帳小日子</h2>
+    
+    <div class="input-group">
+        <label>今日日期</label>
+        <input type="date" id="dateInput">
+    </div>
+
+    <div class="input-group">
+        <label>店家名稱</label>
+        <input type="text" id="storeInput" placeholder="例如：路易莎">
+    </div>
+
+    <div class="input-group">
+        <label>消費項目</label>
+        <input type="text" id="itemInput" placeholder="例如：拿鐵">
+    </div>
+
+    <div class="input-group">
+        <label>金額</label>
+        <input type="number" id="priceInput" placeholder="85">
+    </div>
+
+    <button onclick="sendData()">送出紀錄</button>
+    <div class="status" id="statusMsg"></div>
+</div>
+
+<script>
+    // 自動設定今天日期
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('dateInput').value = today;
+
+    async function sendData() {
+        const statusMsg = document.getElementById('statusMsg');
+        const data = {
+            date: document.getElementById('dateInput').value,
+            store: document.getElementById('storeInput').value,
+            item: document.getElementById('itemInput').value,
+            price: document.getElementById('priceInput').value
+        };
+
+        // 重要：請把下方的網址換成妳 n8n 的 Webhook "Production URL" (或是測試用的 Test URL)
+        const webhookUrl = 'https://tiff719.app.n8n.cloud/webhook/manual_input';
+
+        statusMsg.innerText = '傳送中...';
+
+        try {
+            // 因為我們剛才 n8n 改成 GET 測試，這裡先用 GET 方式傳送
+            const queryString = new URLSearchParams(data).toString();
+            const response = await fetch(`${webhookUrl}?${queryString}`, { method: 'GET' });
+
+            if (response.ok) {
+                statusMsg.style.color = '#7A9D8C';
+                statusMsg.innerText = '✅ 記帳成功！';
+                // 清空輸入
+                document.getElementById('storeInput').value = '';
+                document.getElementById('itemInput').value = '';
+                document.getElementById('priceInput').value = '';
+            } else {
+                throw new Error();
+            }
+        } catch (error) {
+            statusMsg.style.color = '#C97D7D';
+            statusMsg.innerText = '❌ 傳送失敗，請檢查網址';
+        }
+    }
+</script>
+
+</body>
+</html>
