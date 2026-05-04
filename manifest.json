@@ -1,0 +1,15 @@
+{
+  "short_name": "語婕記帳",
+  "name": "語婕的奶茶風記帳小工具",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3256/3256165.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "./index.html",
+  "display": "standalone",
+  "theme_color": "#E6D2C3",
+  "background_color": "#FAF7F2"
+}
