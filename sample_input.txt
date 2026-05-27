@@ -1,0 +1,49 @@
+題目：以生成式 AI 協助企劃轉論文之研究
+英文題目：A Study on Converting Project Proposals into Thesis Format with Generative AI
+作者：王小明
+系所：資訊管理學系碩士班
+學位：碩士論文
+學校：國立嘉義大學
+年份：2026
+月份：6
+
+# 中文摘要
+本研究旨在建立一套可將企劃內容自動整理為論文格式的系統，以降低排版與整理成本。
+研究重點包括章節重組、表圖編號，以及目次、表次、圖次的自動生成。
+關鍵詞：生成式AI、論文排版、自動化、文件生成
+
+# 英文摘要
+This study aims to build a system that transforms project proposals into thesis-ready documents.
+The system focuses on chapter restructuring, figure and table numbering, and automatic generation of the table of contents, list of tables, and list of figures.
+Keywords: generative AI, thesis formatting, automation, document generation
+
+# 誌謝
+感謝指導老師與研究夥伴提供意見，協助本研究順利完成。
+
+# 第一章 緒論
+## 第一節 研究背景與動機
+近年來，企劃與論文之間的轉換需求持續增加，但格式整理往往耗費大量時間。
+
+## 第二節 研究目的
+本研究希望建立一套支援完整論文格式的生成器。
+
+[TABLE title="研究階段規劃"]
+| 階段 | 內容 | 產出 |
+| --- | --- | --- |
+| 第一階段 | 蒐集格式規範 | 撰寫需求 |
+| 第二階段 | 開發生成器 | 系統原型 |
+| 第三階段 | 驗證輸出結果 | 論文文件 |
+註：本表為研究執行規劃摘要。
+[/TABLE]
+
+# 第二章 文獻探討
+## 第一節 自動化排版工具
+本節整理文件自動化與學術寫作工具的相關研究。
+
+# 參考文獻
+林雍智（2020）。教育學門論文寫作格式指引：APA 格式第七版之應用。心理出版社。
+American Psychological Association. (2020). Publication manual of the American Psychological Association (7th ed.). American Psychological Association.
+
+[APPENDIX title="附錄一 使用者輸入範例"]
+這裡可以放問卷、補充資料、原始企劃內容，或其他附件。
+[/APPENDIX]
