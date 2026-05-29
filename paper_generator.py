@@ -31,6 +31,7 @@ TITLE_KEYS = {
 SECTION_ALIASES = {
     "中文摘要": "abstract_zh",
     "摘要": "abstract_zh",
+    "執行摘要": "abstract_zh",
     "英文摘要": "abstract_en",
     "Abstract": "abstract_en",
     "誌謝": "acknowledgements",
@@ -40,6 +41,78 @@ SECTION_ALIASES = {
 }
 
 SPECIAL_HEADINGS = set(SECTION_ALIASES.keys())
+
+
+@dataclass(frozen=True)
+class TemplateSpec:
+    key: str
+    label: str
+    document_type: str
+    organization_default: str
+    abstract_title: str
+    english_abstract_title: str
+    toc_title: str
+    references_title: str
+    appendix_title: str
+    include_english_abstract: bool
+    include_figure_lists: bool
+    cover_hint: str
+
+
+TEMPLATES: dict[str, TemplateSpec] = {
+    "thesis": TemplateSpec(
+        key="thesis",
+        label="論文版",
+        document_type="碩士論文",
+        organization_default="國立嘉義大學",
+        abstract_title="摘  要",
+        english_abstract_title="Abstract",
+        toc_title="目次",
+        references_title="參考文獻",
+        appendix_title="附錄",
+        include_english_abstract=True,
+        include_figure_lists=True,
+        cover_hint="適合學術論文、研究計畫、正式研究報告。",
+    ),
+    "report": TemplateSpec(
+        key="report",
+        label="專題報告版",
+        document_type="專題報告",
+        organization_default="未命名單位",
+        abstract_title="摘要",
+        english_abstract_title="Abstract",
+        toc_title="目錄",
+        references_title="參考資料",
+        appendix_title="附錄",
+        include_english_abstract=False,
+        include_figure_lists=True,
+        cover_hint="適合課堂專題、結案報告、技術報告。",
+    ),
+    "proposal": TemplateSpec(
+        key="proposal",
+        label="商業提案版",
+        document_type="商業提案",
+        organization_default="未命名公司",
+        abstract_title="執行摘要",
+        english_abstract_title="Executive Summary",
+        toc_title="提案目錄",
+        references_title="參考資料",
+        appendix_title="補充附件",
+        include_english_abstract=False,
+        include_figure_lists=False,
+        cover_hint="適合提案書、募資簡報文稿、商業合作文件。",
+    ),
+}
+
+TEMPLATE_OPTIONS = [
+    {
+        "key": spec.key,
+        "label": spec.label,
+        "documentType": spec.document_type,
+        "hint": spec.cover_hint,
+    }
+    for spec in TEMPLATES.values()
+]
 
 
 @dataclass
@@ -87,11 +160,94 @@ class ParseError(ValueError):
     pass
 
 
-def parse_document_text(raw_text: str) -> PaperContent:
+def generate_professional_docx(
+    raw_text: str,
+    output_path: str | Path,
+    template_key: str = "thesis",
+) -> Path:
+    template = TEMPLATES.get(template_key, TEMPLATES["thesis"])
+    paper = parse_document_text(raw_text, template)
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    document = Document()
+    _configure_document(document)
+    _define_styles(document)
+
+    _build_cover(document, paper, template)
+
+    front_section = document.add_section(WD_SECTION.NEW_PAGE)
+    _configure_section(front_section)
+    _set_page_number_format(front_section, fmt="lowerRoman", start=1)
+    _add_page_number(front_section)
+
+    _build_abstract_zh(document, paper, template)
+    if template.include_english_abstract:
+        _build_abstract_en(document, paper, template)
+    if paper.acknowledgements:
+        _build_center_title(document, "誌謝")
+        _write_multiline_paragraphs(document, paper.acknowledgements)
+        document.add_page_break()
+
+    _build_center_title(document, template.toc_title)
+    _insert_toc_field(document.add_paragraph(), r'TOC \o "1-3" \h \z \u')
+    document.add_page_break()
+
+    if template.include_figure_lists:
+        _build_center_title(document, "表次")
+        _insert_toc_field(document.add_paragraph(), r'TOC \h \z \f t')
+        document.add_page_break()
+
+        _build_center_title(document, "圖次")
+        _insert_toc_field(document.add_paragraph(), r'TOC \h \z \f f')
+        document.add_page_break()
+
+    body_section = document.add_section(WD_SECTION.NEW_PAGE)
+    _configure_section(body_section)
+    _set_page_number_format(body_section, fmt="decimal", start=1)
+    _add_page_number(body_section)
+
+    figure_counters: dict[int, int] = {}
+    table_counters: dict[int, int] = {}
+
+    for chapter_index, chapter in enumerate(paper.chapters, start=1):
+        _add_chapter_heading(document, chapter.title, chapter_index > 1)
+        if not chapter.sections:
+            chapter.sections.append(SectionBlock(title="第一節 內容"))
+        for section in chapter.sections:
+            _add_section_heading(document, section.title)
+            for block in section.blocks:
+                if isinstance(block, str):
+                    if block == "":
+                        document.add_paragraph("")
+                    else:
+                        p = document.add_paragraph(style="BodyTextCustom")
+                        p.add_run(block)
+                elif isinstance(block, TableBlock):
+                    caption = _next_caption("表", chapter_index, table_counters, block.title)
+                    _add_caption(document, caption, toc_id="t")
+                    _add_table(document, block)
+                elif isinstance(block, FigureBlock):
+                    caption = _next_caption("圖", chapter_index, figure_counters, block.title)
+                    _add_caption(document, caption, toc_id="f")
+                    _add_figure(document, block)
+
+    _build_references(document, paper.references, template.references_title)
+    _build_appendices(document, paper.appendices, template.appendix_title)
+    _mark_fields_for_update(document)
+    document.save(output)
+    return output
+
+
+def generate_paper_docx(raw_text: str, output_path: str | Path) -> Path:
+    return generate_professional_docx(raw_text, output_path, template_key="thesis")
+
+
+def parse_document_text(raw_text: str, template: TemplateSpec) -> PaperContent:
     lines = _normalize_raw_text(raw_text).split("\n")
     metadata: dict[str, str] = {
-        "organization": "未命名機構",
-        "document_type": "正式文件",
+        "organization": template.organization_default,
+        "document_type": template.document_type,
         "department": "",
         "author": "",
         "title": "未命名文件",
@@ -246,82 +402,6 @@ def parse_document_text(raw_text: str) -> PaperContent:
     )
 
 
-def generate_professional_docx(raw_text: str, output_path: str | Path) -> Path:
-    paper = parse_document_text(raw_text)
-    output = Path(output_path)
-    output.parent.mkdir(parents=True, exist_ok=True)
-
-    document = Document()
-    _configure_document(document)
-    _define_styles(document)
-
-    _build_cover(document, paper)
-
-    front_section = document.add_section(WD_SECTION.NEW_PAGE)
-    _configure_section(front_section)
-    _set_page_number_format(front_section, fmt="lowerRoman", start=1)
-    _add_page_number(front_section)
-
-    _build_abstract_zh(document, paper)
-    _build_abstract_en(document, paper)
-    if paper.acknowledgements:
-        _build_center_title(document, "誌謝")
-        _write_multiline_paragraphs(document, paper.acknowledgements)
-        document.add_page_break()
-
-    _build_center_title(document, "目次")
-    _insert_toc_field(document.add_paragraph(), r'TOC \o "1-3" \h \z \u')
-    document.add_page_break()
-
-    _build_center_title(document, "表次")
-    _insert_toc_field(document.add_paragraph(), r'TOC \h \z \f t')
-    document.add_page_break()
-
-    _build_center_title(document, "圖次")
-    _insert_toc_field(document.add_paragraph(), r'TOC \h \z \f f')
-    document.add_page_break()
-
-    body_section = document.add_section(WD_SECTION.NEW_PAGE)
-    _configure_section(body_section)
-    _set_page_number_format(body_section, fmt="decimal", start=1)
-    _add_page_number(body_section)
-
-    figure_counters: dict[int, int] = {}
-    table_counters: dict[int, int] = {}
-
-    for chapter_index, chapter in enumerate(paper.chapters, start=1):
-        _add_chapter_heading(document, chapter.title, chapter_index > 1)
-        if not chapter.sections:
-            chapter.sections.append(SectionBlock(title="第一節 內容"))
-        for section in chapter.sections:
-            _add_section_heading(document, section.title)
-            for block in section.blocks:
-                if isinstance(block, str):
-                    if block == "":
-                        document.add_paragraph("")
-                    else:
-                        p = document.add_paragraph(style="BodyTextCustom")
-                        p.add_run(block)
-                elif isinstance(block, TableBlock):
-                    caption = _next_caption("表", chapter_index, table_counters, block.title)
-                    _add_caption(document, caption, toc_id="t")
-                    _add_table(document, block)
-                elif isinstance(block, FigureBlock):
-                    caption = _next_caption("圖", chapter_index, figure_counters, block.title)
-                    _add_caption(document, caption, toc_id="f")
-                    _add_figure(document, block)
-
-    _build_references(document, paper.references)
-    _build_appendices(document, paper.appendices)
-    _mark_fields_for_update(document)
-    document.save(output)
-    return output
-
-
-def generate_paper_docx(raw_text: str, output_path: str | Path) -> Path:
-    return generate_professional_docx(raw_text, output_path)
-
-
 def _normalize_raw_text(raw_text: str) -> str:
     text = raw_text.replace("\r\n", "\n").replace("\r", "\n")
     lines = text.split("\n")
@@ -464,16 +544,16 @@ def _define_styles(document: Document) -> None:
     heading2.paragraph_format.line_spacing = 1.5
 
 
-def _build_cover(document: Document, paper: PaperContent) -> None:
+def _build_cover(document: Document, paper: PaperContent, template: TemplateSpec) -> None:
     content = [
-        paper.metadata.get("organization") or "未命名機構",
+        paper.metadata.get("organization") or template.organization_default,
         paper.metadata.get("department") or "單位名稱",
-        paper.metadata.get("document_type") or "正式文件",
+        paper.metadata.get("document_type") or template.document_type,
         "",
         paper.metadata.get("title") or "文件題目",
         paper.metadata.get("title_en") or "Document Title",
         "",
-        f"作者：{paper.metadata.get('author') or '姓名'}",
+        f"作者：{paper.metadata.get('author') or '未填寫'}",
         f"{paper.metadata.get('year') or '2026'} 年 {paper.metadata.get('month') or '6'} 月",
     ]
     for line in content:
@@ -488,33 +568,35 @@ def _build_cover(document: Document, paper: PaperContent) -> None:
     document.add_page_break()
 
 
-def _build_abstract_zh(document: Document, paper: PaperContent) -> None:
+def _build_abstract_zh(document: Document, paper: PaperContent, template: TemplateSpec) -> None:
     _build_center_title(document, paper.metadata.get("title") or "文件題目")
-    _build_center_subtitle(document, paper.metadata.get("author") or "姓名")
+    _build_center_subtitle(document, paper.metadata.get("author") or "未填寫")
     _build_center_subtitle(document, paper.metadata.get("department") or "單位名稱")
-    _build_center_title(document, "摘  要", size=16)
+    _build_center_title(document, template.abstract_title, size=16)
     if paper.abstract_zh:
         _write_multiline_paragraphs(document, paper.abstract_zh)
-        p = document.add_paragraph(style="BodyTextCustom")
-        run = p.add_run("關鍵詞：")
-        run.bold = True
-        p.add_run("、".join(paper.keywords_zh))
+        if paper.keywords_zh:
+            p = document.add_paragraph(style="BodyTextCustom")
+            run = p.add_run("關鍵詞：")
+            run.bold = True
+            p.add_run("、".join(paper.keywords_zh))
     else:
         p = document.add_paragraph(style="BodyTextCustom")
-        p.add_run("（未提供中文摘要）")
+        p.add_run("（未提供摘要）")
     document.add_page_break()
 
 
-def _build_abstract_en(document: Document, paper: PaperContent) -> None:
+def _build_abstract_en(document: Document, paper: PaperContent, template: TemplateSpec) -> None:
     _build_center_title(document, paper.metadata.get("title_en") or "Document Title")
     _build_center_subtitle(document, paper.metadata.get("author") or "Author")
     _build_center_subtitle(document, paper.metadata.get("department") or "Department")
-    _build_center_title(document, "Abstract", size=16, east_asia_font="Times New Roman", latin_font="Times New Roman")
+    _build_center_title(document, template.english_abstract_title, size=16, east_asia_font="Times New Roman", latin_font="Times New Roman")
     if paper.abstract_en:
         _write_multiline_paragraphs(document, paper.abstract_en, font_name="Times New Roman")
-        p = document.add_paragraph(style="BodyTextCustom")
-        _set_run_font(p.add_run("Keywords: "), "Times New Roman", 12, italic=True)
-        _set_run_font(p.add_run(", ".join(paper.keywords_en)), "Times New Roman", 12)
+        if paper.keywords_en:
+            p = document.add_paragraph(style="BodyTextCustom")
+            _set_run_font(p.add_run("Keywords: "), "Times New Roman", 12, italic=True)
+            _set_run_font(p.add_run(", ".join(paper.keywords_en)), "Times New Roman", 12)
     else:
         p = document.add_paragraph(style="BodyTextCustom")
         _set_run_font(p.add_run("(English abstract not provided)"), "Times New Roman", 12)
@@ -620,13 +702,11 @@ def _add_figure(document: Document, figure_block: FigureBlock) -> None:
     document.add_paragraph("")
 
 
-def _build_references(document: Document, references: list[str]) -> None:
-    document.add_page_break()
-    document.add_paragraph("參考文獻", style="Heading 1")
+def _build_references(document: Document, references: list[str], title: str) -> None:
     if not references:
-        p = document.add_paragraph(style="BodyTextCustom")
-        p.add_run("（未提供參考文獻）")
         return
+    document.add_page_break()
+    document.add_paragraph(title, style="Heading 1")
     for ref in references:
         p = document.add_paragraph(style="BodyTextCustom")
         p.paragraph_format.first_line_indent = Cm(-0.74)
@@ -634,11 +714,11 @@ def _build_references(document: Document, references: list[str]) -> None:
         p.add_run(ref)
 
 
-def _build_appendices(document: Document, appendices: list[tuple[str, str]]) -> None:
+def _build_appendices(document: Document, appendices: list[tuple[str, str]], title: str) -> None:
     if not appendices:
         return
     document.add_page_break()
-    document.add_paragraph("附錄", style="Heading 1")
+    document.add_paragraph(title, style="Heading 1")
     for appendix_title, appendix_content in appendices:
         document.add_paragraph(appendix_title, style="Heading 2")
         _write_multiline_paragraphs(document, appendix_content)

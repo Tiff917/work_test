@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>專業文件格式生成器</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Professional Document Formatter</p>
+          <h1>把整篇內容直接變成正式文件</h1>
+          <p class="hero-text">
+            直接貼上企劃、報告、論文草稿或提案內容，選一個模板，系統就會輸出完整的 Word 文件。
+          </p>
+        </div>
+        <div class="hero-card">
+          <p class="hero-card-title">這版支援</p>
+          <ul>
+            <li>論文版</li>
+            <li>專題報告版</li>
+            <li>商業提案版</li>
+          </ul>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="panel controls-panel">
+          <div class="panel-head">
+            <h2>模板設定</h2>
+            <p>先選你要輸出的正式風格</p>
+          </div>
+
+          <div class="field-group">
+            <label for="templateSelect">文件模板</label>
+            <select id="templateSelect"></select>
+            <p id="templateHint" class="helper-text"></p>
+          </div>
+
+          <div class="field-group">
+            <label for="fileName">輸出檔名</label>
+            <input id="fileName" type="text" value="專業文件初稿" />
+          </div>
+
+          <div class="actions">
+            <button id="sampleButton" class="secondary-button">載入範例</button>
+            <button id="generateButton" class="primary-button">生成 Word 文件</button>
+          </div>
+
+          <div id="statusBox" class="status-box idle">等待輸入內容</div>
+
+          <div id="resultBox" class="result-box hidden">
+            <h3>輸出完成</h3>
+            <p id="resultPath"></p>
+            <a id="downloadLink" class="download-button" href="#">下載 Word 檔</a>
+          </div>
+        </section>
+
+        <section class="panel editor-panel">
+          <div class="panel-head">
+            <h2>內容輸入</h2>
+            <p>直接貼整篇內容。原文若已有「第一章、第一節、摘要、參考文獻」，系統會優先辨識。</p>
+          </div>
+
+          <textarea id="contentInput" spellcheck="false"></textarea>
+
+          <details class="tips">
+            <summary>可選圖表格式</summary>
+            <pre>[FIGURE title="流程圖" path="C:/圖片/flow.png" width_cm="13"]
+註：圖片說明
+[/FIGURE]
+
+[TABLE title="研究規劃"]
+| 階段 | 內容 |
+| --- | --- |
+| 第一階段 | 需求分析 |
+註：表格說明
+[/TABLE]</pre>
+          </details>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
