@@ -37,7 +37,9 @@ SECTION_ALIASES = {
     "誌謝": "acknowledgements",
     "謝誌": "acknowledgements",
     "參考文獻": "references",
+    "參考資料": "references",
     "附錄": "appendices",
+    "補充附件": "appendices",
 }
 
 SPECIAL_HEADINGS = set(SECTION_ALIASES.keys())
@@ -99,7 +101,7 @@ TEMPLATES: dict[str, TemplateSpec] = {
         references_title="參考資料",
         appendix_title="補充附件",
         include_english_abstract=False,
-        include_figure_lists=False,
+        include_figure_lists=True,
         cover_hint="適合提案書、募資簡報文稿、商業合作文件。",
     ),
 }
@@ -160,11 +162,7 @@ class ParseError(ValueError):
     pass
 
 
-def generate_professional_docx(
-    raw_text: str,
-    output_path: str | Path,
-    template_key: str = "thesis",
-) -> Path:
+def generate_professional_docx(raw_text: str, output_path: str | Path, template_key: str = "thesis") -> Path:
     template = TEMPLATES.get(template_key, TEMPLATES["thesis"])
     paper = parse_document_text(raw_text, template)
     output = Path(output_path)
@@ -221,8 +219,8 @@ def generate_professional_docx(
                     if block == "":
                         document.add_paragraph("")
                     else:
-                        p = document.add_paragraph(style="BodyTextCustom")
-                        p.add_run(block)
+                        paragraph = document.add_paragraph(style="BodyTextCustom")
+                        paragraph.add_run(block)
                 elif isinstance(block, TableBlock):
                     caption = _next_caption("表", chapter_index, table_counters, block.title)
                     _add_caption(document, caption, toc_id="t")
@@ -286,18 +284,18 @@ def parse_document_text(raw_text: str, template: TemplateSpec) -> PaperContent:
             continue
 
         if line.startswith("關鍵詞："):
-            keywords_zh = [x.strip() for x in line.split("：", 1)[1].split("、") if x.strip()]
+            keywords_zh = [item.strip() for item in line.split("：", 1)[1].split("、") if item.strip()]
             i += 1
             continue
 
         if line.startswith("Keywords:"):
-            keywords_en = [x.strip() for x in line.split(":", 1)[1].split(",") if x.strip()]
+            keywords_en = [item.strip() for item in line.split(":", 1)[1].split(",") if item.strip()]
             i += 1
             continue
 
-        section_match = re.match(r"^#\s+(.+)$", line)
-        if section_match:
-            title = section_match.group(1).strip()
+        chapter_match = re.match(r"^#\s+(.+)$", line)
+        if chapter_match:
+            title = chapter_match.group(1).strip()
             active_special = SECTION_ALIASES.get(title)
             if active_special is None:
                 current_chapter = ChapterBlock(title=title)
@@ -308,11 +306,11 @@ def parse_document_text(raw_text: str, template: TemplateSpec) -> PaperContent:
             i += 1
             continue
 
-        sub_match = re.match(r"^##\s+(.+)$", line)
-        if sub_match:
+        section_match = re.match(r"^##\s+(.+)$", line)
+        if section_match:
             if current_chapter is None:
                 current_chapter, current_section = _ensure_default_section(chapters, current_chapter, current_section)
-            current_section = SectionBlock(title=sub_match.group(1).strip())
+            current_section = SectionBlock(title=section_match.group(1).strip())
             current_chapter.sections.append(current_section)
             active_special = None
             i += 1
@@ -334,9 +332,9 @@ def parse_document_text(raw_text: str, template: TemplateSpec) -> PaperContent:
             if current_section is None:
                 current_chapter, current_section = _ensure_default_section(chapters, current_chapter, current_section)
             attrs = _parse_attrs(line)
-            fig_title = attrs.get("title", "").strip() or "未命名圖片"
-            fig_path = attrs.get("path", "").strip()
-            if not fig_path:
+            figure_title = attrs.get("title", "").strip() or "未命名圖片"
+            figure_path = attrs.get("path", "").strip()
+            if not figure_path:
                 raise ParseError("圖片區塊缺少 path。")
             width_cm = float(attrs.get("width_cm", 14))
             i += 1
@@ -346,8 +344,8 @@ def parse_document_text(raw_text: str, template: TemplateSpec) -> PaperContent:
                 i += 1
             current_section.blocks.append(
                 FigureBlock(
-                    title=fig_title,
-                    path=fig_path,
+                    title=figure_title,
+                    path=figure_path,
                     note="\n".join(note_lines).strip(),
                     width_cm=width_cm,
                 )
@@ -391,11 +389,11 @@ def parse_document_text(raw_text: str, template: TemplateSpec) -> PaperContent:
 
     return PaperContent(
         metadata=metadata,
-        abstract_zh="\n".join(x for x in abstract_zh_lines if x).strip(),
+        abstract_zh="\n".join(line for line in abstract_zh_lines if line).strip(),
         keywords_zh=keywords_zh,
-        abstract_en="\n".join(x for x in abstract_en_lines if x).strip(),
+        abstract_en="\n".join(line for line in abstract_en_lines if line).strip(),
         keywords_en=keywords_en,
-        acknowledgements="\n".join(x for x in acknowledgements_lines if x).strip(),
+        acknowledgements="\n".join(line for line in acknowledgements_lines if line).strip(),
         chapters=chapters,
         references=references,
         appendices=appendices,
@@ -407,7 +405,6 @@ def _normalize_raw_text(raw_text: str) -> str:
     lines = text.split("\n")
     normalized: list[str] = []
     saw_markdown_heading = any(line.strip().startswith("#") for line in lines)
-
     if saw_markdown_heading:
         return text
 
@@ -472,7 +469,7 @@ def _ensure_default_section(
 
 
 def _parse_attrs(line: str) -> dict[str, str]:
-    return {k: v for k, v in re.findall(r'(\w+)="(.*?)"', line)}
+    return {key: value for key, value in re.findall(r'(\w+)="(.*?)"', line)}
 
 
 def _parse_markdown_table(title: str, lines: Iterable[str]) -> TableBlock:
@@ -557,10 +554,10 @@ def _build_cover(document: Document, paper: PaperContent, template: TemplateSpec
         f"{paper.metadata.get('year') or '2026'} 年 {paper.metadata.get('month') or '6'} 月",
     ]
     for line in content:
-        p = document.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p.paragraph_format.line_spacing = 1.5
-        run = p.add_run(line)
+        paragraph = document.add_paragraph()
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph.paragraph_format.line_spacing = 1.5
+        run = paragraph.add_run(line)
         run.bold = True
         run.font.name = "新細明體"
         run._element.rPr.rFonts.set(qn("w:eastAsia"), "新細明體")
@@ -576,13 +573,13 @@ def _build_abstract_zh(document: Document, paper: PaperContent, template: Templa
     if paper.abstract_zh:
         _write_multiline_paragraphs(document, paper.abstract_zh)
         if paper.keywords_zh:
-            p = document.add_paragraph(style="BodyTextCustom")
-            run = p.add_run("關鍵詞：")
+            paragraph = document.add_paragraph(style="BodyTextCustom")
+            run = paragraph.add_run("關鍵詞：")
             run.bold = True
-            p.add_run("、".join(paper.keywords_zh))
+            paragraph.add_run("、".join(paper.keywords_zh))
     else:
-        p = document.add_paragraph(style="BodyTextCustom")
-        p.add_run("（未提供摘要）")
+        paragraph = document.add_paragraph(style="BodyTextCustom")
+        paragraph.add_run("（未提供摘要）")
     document.add_page_break()
 
 
@@ -594,12 +591,12 @@ def _build_abstract_en(document: Document, paper: PaperContent, template: Templa
     if paper.abstract_en:
         _write_multiline_paragraphs(document, paper.abstract_en, font_name="Times New Roman")
         if paper.keywords_en:
-            p = document.add_paragraph(style="BodyTextCustom")
-            _set_run_font(p.add_run("Keywords: "), "Times New Roman", 12, italic=True)
-            _set_run_font(p.add_run(", ".join(paper.keywords_en)), "Times New Roman", 12)
+            paragraph = document.add_paragraph(style="BodyTextCustom")
+            _set_run_font(paragraph.add_run("Keywords: "), "Times New Roman", 12, italic=True)
+            _set_run_font(paragraph.add_run(", ".join(paper.keywords_en)), "Times New Roman", 12)
     else:
-        p = document.add_paragraph(style="BodyTextCustom")
-        _set_run_font(p.add_run("(English abstract not provided)"), "Times New Roman", 12)
+        paragraph = document.add_paragraph(style="BodyTextCustom")
+        _set_run_font(paragraph.add_run("(English abstract not provided)"), "Times New Roman", 12)
     document.add_page_break()
 
 
@@ -610,10 +607,10 @@ def _build_center_title(
     east_asia_font: str = "新細明體",
     latin_font: str = "Times New Roman",
 ) -> None:
-    p = document.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p.paragraph_format.line_spacing = 1.5
-    run = p.add_run(text)
+    paragraph = document.add_paragraph()
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph.paragraph_format.line_spacing = 1.5
+    run = paragraph.add_run(text)
     run.bold = True
     run.font.size = Pt(size)
     run.font.name = latin_font
@@ -621,19 +618,19 @@ def _build_center_title(
 
 
 def _build_center_subtitle(document: Document, text: str) -> None:
-    p = document.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p.paragraph_format.line_spacing = 1.5
-    run = p.add_run(text)
+    paragraph = document.add_paragraph()
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph.paragraph_format.line_spacing = 1.5
+    run = paragraph.add_run(text)
     run.font.size = Pt(14)
     run.font.name = "Times New Roman"
     run._element.rPr.rFonts.set(qn("w:eastAsia"), "新細明體")
 
 
 def _write_multiline_paragraphs(document: Document, text: str, font_name: str = "新細明體") -> None:
-    for part in [x.strip() for x in text.split("\n") if x.strip()]:
-        p = document.add_paragraph(style="BodyTextCustom")
-        _set_run_font(p.add_run(part), font_name, 12)
+    for part in [item.strip() for item in text.split("\n") if item.strip()]:
+        paragraph = document.add_paragraph(style="BodyTextCustom")
+        _set_run_font(paragraph.add_run(part), font_name, 12)
 
 
 def _insert_toc_field(paragraph, instruction: str) -> None:
@@ -656,12 +653,12 @@ def _next_caption(prefix: str, chapter_no: int, counters: dict[int, int], title:
 
 
 def _add_caption(document: Document, caption: str, toc_id: str) -> None:
-    p = document.add_paragraph()
-    p.paragraph_format.line_spacing = 1.5
-    p.paragraph_format.space_before = Pt(12)
-    p.paragraph_format.space_after = Pt(6)
-    _append_tc_field(p, caption, toc_id)
-    run = p.add_run(caption)
+    paragraph = document.add_paragraph()
+    paragraph.paragraph_format.line_spacing = 1.5
+    paragraph.paragraph_format.space_before = Pt(12)
+    paragraph.paragraph_format.space_after = Pt(6)
+    _append_tc_field(paragraph, caption, toc_id)
+    run = paragraph.add_run(caption)
     run.bold = True
     run.font.size = Pt(12)
     run.font.name = "Times New Roman"
@@ -679,8 +676,8 @@ def _add_table(document: Document, table_block: TableBlock) -> None:
             if idx < len(row_cells):
                 row_cells[idx].text = value
     if table_block.note:
-        p = document.add_paragraph(style="BodyTextCustom")
-        p.add_run(table_block.note)
+        paragraph = document.add_paragraph(style="BodyTextCustom")
+        paragraph.add_run(table_block.note)
     document.add_paragraph("")
 
 
@@ -689,16 +686,16 @@ def _add_figure(document: Document, figure_block: FigureBlock) -> None:
     if not image_path.is_absolute():
         image_path = Path.cwd() / image_path
     if image_path.exists():
-        p = document.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p.add_run().add_picture(str(image_path), width=Cm(figure_block.width_cm))
+        paragraph = document.add_paragraph()
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph.add_run().add_picture(str(image_path), width=Cm(figure_block.width_cm))
     else:
-        p = document.add_paragraph(style="BodyTextCustom")
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        p.add_run(f"[找不到圖片：{image_path}]")
+        paragraph = document.add_paragraph(style="BodyTextCustom")
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        paragraph.add_run(f"[找不到圖片：{image_path}]")
     if figure_block.note:
-        p = document.add_paragraph(style="BodyTextCustom")
-        p.add_run(figure_block.note)
+        paragraph = document.add_paragraph(style="BodyTextCustom")
+        paragraph.add_run(figure_block.note)
     document.add_paragraph("")
 
 
@@ -708,10 +705,10 @@ def _build_references(document: Document, references: list[str], title: str) -> 
     document.add_page_break()
     document.add_paragraph(title, style="Heading 1")
     for ref in references:
-        p = document.add_paragraph(style="BodyTextCustom")
-        p.paragraph_format.first_line_indent = Cm(-0.74)
-        p.paragraph_format.left_indent = Cm(0.74)
-        p.add_run(ref)
+        paragraph = document.add_paragraph(style="BodyTextCustom")
+        paragraph.paragraph_format.first_line_indent = Cm(-0.74)
+        paragraph.paragraph_format.left_indent = Cm(0.74)
+        paragraph.add_run(ref)
 
 
 def _build_appendices(document: Document, appendices: list[tuple[str, str]], title: str) -> None:
@@ -760,9 +757,9 @@ def _set_page_number_format(section, fmt: str, start: int) -> None:
 def _add_page_number(section) -> None:
     footer = section.footer
     footer.is_linked_to_previous = False
-    p = footer.paragraphs[0]
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    _append_field_run(p, "PAGE")
+    paragraph = footer.paragraphs[0]
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    _append_field_run(paragraph, "PAGE")
 
 
 def _mark_fields_for_update(document: Document) -> None:
