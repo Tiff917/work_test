@@ -13,11 +13,11 @@
           <p class="eyebrow">Professional Document Formatter</p>
           <h1>把整篇內容直接變成正式文件</h1>
           <p class="hero-text">
-            直接貼上企劃、報告、論文草稿或提案內容，選一個模板，系統就會輸出完整的 Word 文件。
+            直接貼上企劃、報告、論文草稿或商業提案內容，選一個模板，系統就會幫你整理成正式的 Word 文件。
           </p>
         </div>
         <div class="hero-card">
-          <p class="hero-card-title">這版支援</p>
+          <p class="hero-card-title">目前模板</p>
           <ul>
             <li>論文版</li>
             <li>專題報告版</li>
@@ -40,13 +40,13 @@
           </div>
 
           <div class="field-group">
-            <label for="fileName">輸出檔名</label>
+            <label for="fileName">檔案名稱</label>
             <input id="fileName" type="text" value="專業文件初稿" />
           </div>
 
           <div class="actions">
             <button id="sampleButton" class="secondary-button">載入範例</button>
-            <button id="generateButton" class="primary-button">生成 Word 文件</button>
+            <button id="generateButton" class="primary-button">生成並選擇儲存位置</button>
           </div>
 
           <div id="statusBox" class="status-box idle">等待輸入內容</div>
@@ -54,7 +54,8 @@
           <div id="resultBox" class="result-box hidden">
             <h3>輸出完成</h3>
             <p id="resultPath"></p>
-            <a id="downloadLink" class="download-button" href="#">下載 Word 檔</a>
+            <button id="saveAgainButton" class="download-button" type="button">重新儲存一份</button>
+            <a id="downloadLink" class="download-link" href="#">如果瀏覽器不支援，可改用一般下載</a>
           </div>
         </section>
 

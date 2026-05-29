@@ -6,6 +6,7 @@ const statusBox = document.getElementById("statusBox");
 const resultBox = document.getElementById("resultBox");
 const resultPath = document.getElementById("resultPath");
 const downloadLink = document.getElementById("downloadLink");
+const saveAgainButton = document.getElementById("saveAgainButton");
 const sampleButton = document.getElementById("sampleButton");
 const generateButton = document.getElementById("generateButton");
 
@@ -82,6 +83,7 @@ Keywords: document generation, thesis formatting, automation
 };
 
 let templates = [];
+let lastGenerated = null;
 
 async function init() {
   const response = await fetch("/api/templates");
@@ -109,7 +111,12 @@ function syncTemplateMeta() {
 function loadSample() {
   const selectedKey = templateSelect.value || "thesis";
   contentInput.value = sampleTexts[selectedKey] || sampleTexts.thesis;
-  fileNameInput.value = selectedKey === "proposal" ? "商業提案初稿" : selectedKey === "report" ? "專題報告初稿" : "論文初稿";
+  fileNameInput.value =
+    selectedKey === "proposal"
+      ? "商業提案初稿"
+      : selectedKey === "report"
+        ? "專題報告初稿"
+        : "論文初稿";
   setStatus("已載入模板範例內容。", "idle");
   resultBox.classList.add("hidden");
 }
@@ -142,15 +149,67 @@ async function generate() {
       throw new Error(data.error || "生成失敗");
     }
 
-    resultPath.textContent = `輸出位置：${data.outputPath}`;
+    lastGenerated = data;
+    resultPath.textContent = `暫存位置：${data.outputPath}`;
     downloadLink.href = data.downloadUrl;
     downloadLink.download = data.fileName;
     resultBox.classList.remove("hidden");
-    setStatus("文件已生成完成。", "success");
+
+    await saveGeneratedFile(data);
   } catch (error) {
     setStatus(error.message || "生成失敗。", "error");
   } finally {
     generateButton.disabled = false;
+  }
+}
+
+async function saveGeneratedFile(data) {
+  const response = await fetch(data.downloadUrl);
+  if (!response.ok) {
+    throw new Error("檔案已生成，但下載連結失敗。");
+  }
+
+  const blob = await response.blob();
+
+  if (window.showSaveFilePicker) {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: data.fileName,
+      types: [
+        {
+          description: "Word 文件",
+          accept: {
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"]
+          }
+        }
+      ]
+    });
+    const writable = await handle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    setStatus("文件已儲存完成。", "success");
+    return;
+  }
+
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = data.fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+  setStatus("你的瀏覽器不支援選位置儲存，已改用一般下載。", "success");
+}
+
+async function saveAgain() {
+  if (!lastGenerated) {
+    setStatus("目前沒有可重新儲存的檔案。", "error");
+    return;
+  }
+  try {
+    await saveGeneratedFile(lastGenerated);
+  } catch (error) {
+    setStatus(error.message || "重新儲存失敗。", "error");
   }
 }
 
@@ -166,5 +225,6 @@ templateSelect.addEventListener("change", () => {
 
 sampleButton.addEventListener("click", loadSample);
 generateButton.addEventListener("click", generate);
+saveAgainButton.addEventListener("click", saveAgain);
 
 init();
