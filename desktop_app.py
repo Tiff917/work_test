@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from docx import Document
 
@@ -18,13 +18,13 @@ class DesktopFormatterApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("專業文件格式生成器 - 桌面版")
-        self.root.geometry("1180x820")
-        self.root.minsize(960, 700)
+        self.root.geometry("1220x860")
+        self.root.minsize(980, 720)
 
         self.template_map = {item["label"]: item for item in TEMPLATE_OPTIONS}
         self.template_var = tk.StringVar(value=TEMPLATE_OPTIONS[0]["label"])
         self.file_name_var = tk.StringVar(value="專業文件初稿")
-        self.status_var = tk.StringVar(value="貼上內容後，按右上角生成，系統會先跳出存檔視窗。")
+        self.status_var = tk.StringVar(value="貼上內容後，按生成會直接跳出 Windows 存檔視窗。")
 
         self._build_layout()
         self.load_sample()
@@ -40,8 +40,8 @@ class DesktopFormatterApp:
             text=(
                 "1. 選模板\n"
                 "2. 貼上整篇內容\n"
-                "3. 按「生成並選擇儲存位置」\n"
-                "4. 會直接跳出 Windows 存檔視窗"
+                "3. 如果有圖片或表格，用右邊按鈕插入\n"
+                "4. 按生成後會跳出 Windows 原生存檔視窗"
             ),
             justify="left",
         ).pack(anchor="w")
@@ -89,16 +89,18 @@ class DesktopFormatterApp:
         ttk.Button(button_bar, text="清空內容", command=self.clear_content).pack(fill="x", pady=(8, 0))
         ttk.Button(button_bar, text="生成並選擇儲存位置", command=self.generate_document).pack(fill="x", pady=(16, 0))
 
-        tips = ttk.LabelFrame(panel, text="小提醒", padding=12)
+        tips = ttk.LabelFrame(panel, text="圖表插入", padding=12)
         tips.pack(fill="x", pady=(18, 0))
+        ttk.Button(tips, text="選圖片並插入", command=self.insert_figure_block).pack(fill="x")
+        ttk.Button(tips, text="插入表格", command=self.insert_table_block).pack(fill="x", pady=(8, 0))
         ttk.Label(
             tips,
             text=(
-                "桌面版會使用 Windows 原生存檔視窗。\n"
-                "也就是你每次按生成，都能自己決定要存到哪個資料夾。"
+                "按按鈕後，系統會自動把圖片或表格格式寫進內容區。\n"
+                "你不用自己手打 [FIGURE] 或 [TABLE]。"
             ),
             justify="left",
-        ).pack(anchor="w")
+        ).pack(anchor="w", pady=(10, 0))
 
         self._update_template_hint()
 
@@ -108,7 +110,7 @@ class DesktopFormatterApp:
 
         ttk.Label(
             panel,
-            text="直接貼整篇內容。原文若已有「第一章、第一節、摘要、參考文獻」，系統會優先辨識。",
+            text="直接貼整篇內容。若內容裡有圖片與表格，請用右側按鈕插入，系統才會自動做圖次與表次。",
         ).pack(anchor="w")
 
         self.editor = tk.Text(panel, wrap="word", font=("Microsoft JhengHei UI", 11))
@@ -181,6 +183,66 @@ class DesktopFormatterApp:
         if messagebox.askyesno("確認清空", "要清空目前內容嗎？"):
             self.editor.delete("1.0", tk.END)
             self.status_var.set("內容已清空。")
+
+    def insert_figure_block(self) -> None:
+        image_path = filedialog.askopenfilename(
+            title="選擇圖片",
+            filetypes=[("圖片", "*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.webp"), ("所有檔案", "*.*")],
+        )
+        if not image_path:
+            return
+
+        title = simpledialog.askstring("圖片標題", "請輸入這張圖的標題，例如：系統流程圖", parent=self.root)
+        if not title:
+            title = Path(image_path).stem
+
+        note = simpledialog.askstring("圖片說明", "請輸入圖下方說明，可留空", parent=self.root) or ""
+        width = simpledialog.askstring("圖片寬度", "請輸入圖片寬度（公分），預設 13", parent=self.root) or "13"
+
+        block_lines = [f'[FIGURE title="{title}" path="{Path(image_path).as_posix()}" width_cm="{width}"]']
+        if note.strip():
+            block_lines.append(f"註：{note.strip()}")
+        block_lines.append("[/FIGURE]")
+        self._insert_block("\n" + "\n".join(block_lines) + "\n")
+        self.status_var.set("已插入圖片區塊，生成時會自動列入圖次。")
+
+    def insert_table_block(self) -> None:
+        title = simpledialog.askstring("表格標題", "請輸入表格標題，例如：研究規劃表", parent=self.root)
+        if not title:
+            return
+
+        columns_raw = simpledialog.askstring("欄位名稱", "請輸入欄位名稱，用逗號分開，例如：階段,內容,產出", parent=self.root)
+        if not columns_raw:
+            return
+
+        columns = [item.strip() for item in columns_raw.split(",") if item.strip()]
+        if not columns:
+            messagebox.showwarning("欄位錯誤", "至少要有一個欄位。")
+            return
+
+        row_count_raw = simpledialog.askstring("資料列數", "要先建立幾列空白資料？預設 3", parent=self.root) or "3"
+        try:
+            row_count = max(1, int(row_count_raw))
+        except ValueError:
+            row_count = 3
+
+        note = simpledialog.askstring("表格說明", "請輸入表下方說明，可留空", parent=self.root) or ""
+
+        header = "| " + " | ".join(columns) + " |"
+        separator = "| " + " | ".join(["---"] * len(columns)) + " |"
+        rows = ["| " + " | ".join(["請填內容"] * len(columns)) + " |" for _ in range(row_count)]
+
+        block_lines = [f'[TABLE title="{title}"]', header, separator, *rows]
+        if note.strip():
+            block_lines.append(f"註：{note.strip()}")
+        block_lines.append("[/TABLE]")
+
+        self._insert_block("\n" + "\n".join(block_lines) + "\n")
+        self.status_var.set("已插入表格區塊，生成時會自動列入表次。")
+
+    def _insert_block(self, text: str) -> None:
+        self.editor.insert(tk.INSERT, text)
+        self.editor.focus_set()
 
     def generate_document(self) -> None:
         raw_text = self.editor.get("1.0", tk.END).strip()
