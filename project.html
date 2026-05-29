@@ -1,0 +1,1153 @@
+
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tiff'stdio | System Design For Sellers</title>
+    <style>
+      :root {
+        --bg: #f6f1ea;
+        --bg-soft: #fbf8f4;
+        --surface: rgba(255, 251, 247, 0.72);
+        --surface-strong: rgba(255, 250, 246, 0.92);
+        --surface-deep: rgba(236, 228, 218, 0.92);
+        --line: rgba(140, 116, 96, 0.16);
+        --line-strong: rgba(140, 116, 96, 0.24);
+        --text: #43362e;
+        --muted: #77665a;
+        --muted-soft: #9f8e80;
+        --accent: #b89374;
+        --accent-deep: #8e6950;
+        --accent-fade: #d9c7b7;
+        --shadow: 0 24px 70px rgba(102, 80, 63, 0.12);
+        --radius-xl: 34px;
+        --radius-lg: 26px;
+        --radius-md: 18px;
+        --shell: min(1180px, calc(100vw - 32px));
+      }
+
+      * { box-sizing: border-box; }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(236, 222, 208, 0.82), transparent 34%),
+          radial-gradient(circle at top right, rgba(222, 209, 196, 0.68), transparent 28%),
+          linear-gradient(180deg, #f8f4ee 0%, #f3ede6 42%, #f8f4ef 100%);
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .page-shell {
+        position: relative;
+        width: var(--shell);
+        margin: 18px auto 48px;
+        padding: 22px;
+        border-radius: 40px;
+        background: rgba(255, 253, 249, 0.62);
+        border: 1px solid rgba(255, 255, 255, 0.55);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .ambient {
+        position: absolute;
+        border-radius: 999px;
+        filter: blur(0);
+        pointer-events: none;
+        opacity: 0.62;
+      }
+
+      .ambient-a {
+        top: -120px;
+        right: -30px;
+        width: 280px;
+        height: 280px;
+        background: radial-gradient(circle, rgba(212, 192, 173, 0.92), rgba(212, 192, 173, 0));
+      }
+
+      .ambient-b {
+        top: 380px;
+        left: -90px;
+        width: 240px;
+        height: 240px;
+        background: radial-gradient(circle, rgba(228, 214, 199, 0.9), rgba(228, 214, 199, 0));
+      }
+
+      .ambient-c {
+        bottom: -110px;
+        right: 10%;
+        width: 320px;
+        height: 320px;
+        background: radial-gradient(circle, rgba(226, 206, 186, 0.8), rgba(226, 206, 186, 0));
+      }
+
+      .site-header {
+        position: sticky;
+        top: 18px;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 28px;
+        padding: 18px 22px;
+        border: 1px solid rgba(255, 255, 255, 0.65);
+        border-radius: 999px;
+        background: rgba(255, 251, 246, 0.72);
+        backdrop-filter: blur(16px);
+      }
+
+      .brand {
+        font-family: "Georgia", serif;
+        font-size: 1.25rem;
+        letter-spacing: 0.04em;
+      }
+
+      .nav-toggle {
+        display: none;
+        padding: 10px 14px;
+        border: 0;
+        border-radius: 999px;
+        background: rgba(233, 223, 214, 0.9);
+        color: var(--text);
+        font-weight: 700;
+      }
+
+      .site-nav {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+
+      .site-nav a:hover {
+        color: var(--accent-deep);
+      }
+
+      main {
+        display: grid;
+        gap: 22px;
+      }
+
+      .hero,
+      .story-card,
+      .system-section,
+      .case-section,
+      .compare-section,
+      .process-section,
+      .proof-section,
+      .cta-section {
+        position: relative;
+        border-radius: var(--radius-xl);
+        border: 1px solid rgba(255, 255, 255, 0.68);
+        background: var(--surface);
+        backdrop-filter: blur(16px);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr);
+        gap: 24px;
+        padding: 40px;
+      }
+
+      .hero-copy,
+      .hero-panel,
+      .system-section,
+      .case-section,
+      .compare-section,
+      .process-section,
+      .proof-section,
+      .cta-section {
+        padding: 0;
+      }
+
+      .hero-copy h1,
+      .section-heading h2,
+      .cta-copy h2 {
+        margin: 0;
+        font-family: "Georgia", serif;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+      }
+
+      h1 {
+        max-width: 11ch;
+        margin-bottom: 18px;
+        font-size: clamp(3rem, 5vw, 5.2rem);
+        line-height: 1.08;
+      }
+
+      h2 {
+        font-size: clamp(2rem, 3vw, 3.15rem);
+        line-height: 1.16;
+      }
+
+      h3 {
+        margin: 0 0 14px;
+        font-size: 1.26rem;
+        line-height: 1.42;
+      }
+
+      p {
+        margin: 0;
+      }
+
+      .eyebrow,
+      .section-tag,
+      .case-label,
+      .audience-kicker {
+        color: var(--muted-soft);
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-size: 0.78rem;
+        font-weight: 700;
+      }
+
+      .hero-text,
+      .story-card p,
+      .service-card p,
+      .case-card p,
+      .compare-card li,
+      .process-card p,
+      .proof-card p,
+      .cta-copy p,
+      .catalog-note p,
+      .contact-list p {
+        color: var(--muted);
+        font-size: 1.03rem;
+        line-height: 1.95;
+        letter-spacing: 0.01em;
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin: 34px 0 34px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 52px;
+        padding: 0 24px;
+        border-radius: 999px;
+        font-weight: 800;
+        transition: transform 160ms ease, box-shadow 160ms ease;
+      }
+
+      .button:hover {
+        transform: translateY(-1px);
+      }
+
+      .button-primary {
+        background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+        color: #fffaf6;
+        box-shadow: 0 16px 30px rgba(142, 105, 80, 0.22);
+      }
+
+      .button-secondary {
+        background: rgba(255, 251, 246, 0.84);
+        border: 1px solid var(--line);
+        color: var(--accent-deep);
+      }
+
+      .button-wide {
+        width: 100%;
+      }
+
+      .audience-strip {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .audience-card,
+      .panel-stat,
+      .story-card,
+      .service-card,
+      .case-card,
+      .compare-card,
+      .process-card,
+      .proof-card,
+      .cta-panel,
+      .notion-card,
+      .catalog-note,
+      .notion-showcase {
+        border-radius: var(--radius-lg);
+        border: 1px solid rgba(255, 255, 255, 0.68);
+        background: var(--surface-strong);
+        box-shadow: 0 14px 34px rgba(115, 91, 72, 0.08);
+      }
+
+      .audience-card {
+        display: grid;
+        gap: 10px;
+        padding: 22px;
+      }
+
+      .audience-card.is-active {
+        background: linear-gradient(160deg, rgba(184, 147, 116, 0.96), rgba(142, 105, 80, 0.96));
+        color: #fffaf6;
+      }
+
+      .audience-card.is-active .audience-kicker,
+      .audience-card.is-active span {
+        color: rgba(255, 250, 246, 0.8);
+      }
+
+      .hero-panel {
+        display: grid;
+        gap: 14px;
+        align-content: start;
+      }
+
+      .panel-stat {
+        padding: 24px;
+      }
+
+      .panel-stat span {
+        display: block;
+        margin-bottom: 10px;
+        color: var(--muted-soft);
+        font-size: 0.82rem;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+      }
+
+      .panel-stat strong {
+        font-size: 1.1rem;
+        line-height: 1.55;
+      }
+
+      .story-grid,
+      .service-grid,
+      .case-grid,
+      .compare-grid,
+      .process-grid,
+      .proof-grid {
+        display: grid;
+        gap: 18px;
+      }
+
+      .story-grid {
+        grid-template-columns: 1.1fr 0.9fr 0.9fr;
+      }
+
+      .story-card,
+      .service-card,
+      .case-card,
+      .compare-card,
+      .process-card,
+      .proof-card,
+      .catalog-note,
+      .notion-showcase,
+      .cta-panel {
+        padding: 30px;
+      }
+
+      .accent-card {
+        background: linear-gradient(160deg, rgba(239, 230, 220, 0.95), rgba(250, 246, 241, 0.98));
+      }
+
+      .section-heading,
+      .cta-copy {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 22px;
+      }
+
+      .system-section,
+      .case-section,
+      .compare-section,
+      .process-section,
+      .proof-section,
+      .cta-section {
+        padding: 36px;
+      }
+
+      .service-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .service-index {
+        display: inline-flex;
+        margin-bottom: 18px;
+        color: var(--muted-soft);
+        font-size: 0.88rem;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+      }
+
+      .catalog-frame {
+        display: grid;
+        gap: 18px;
+        padding: 20px;
+        border-radius: var(--radius-lg);
+        background: rgba(248, 243, 236, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.55);
+      }
+
+      .case-grid {
+        grid-template-columns: 1.1fr 0.9fr;
+      }
+
+      .case-card-featured {
+        background: linear-gradient(160deg, rgba(129, 98, 75, 0.96), rgba(168, 128, 99, 0.96));
+        color: #fffaf6;
+      }
+
+      .case-card-featured p,
+      .case-card-featured h3 {
+        color: #fffaf6;
+      }
+
+      .case-card-featured .case-label {
+        color: rgba(255, 250, 246, 0.7);
+      }
+
+      .profit-widget {
+        display: grid;
+        grid-template-columns: 180px 1fr;
+        gap: 18px;
+        margin-top: 22px;
+      }
+
+      .profit-chart-shell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .profit-chart {
+        width: 170px;
+        height: 170px;
+      }
+
+      .chart-track,
+      .chart-segment {
+        fill: none;
+        stroke-width: 18;
+        transform: rotate(-90deg);
+        transform-origin: 50% 50%;
+      }
+
+      .chart-track {
+        stroke: rgba(255, 250, 246, 0.18);
+      }
+
+      .chart-profit {
+        stroke: #fff5ea;
+        stroke-dasharray: 171 452;
+      }
+
+      .chart-cost {
+        stroke: rgba(255, 240, 228, 0.66);
+        stroke-dasharray: 126 452;
+        stroke-dashoffset: -184;
+      }
+
+      .chart-ops {
+        stroke: rgba(255, 240, 228, 0.36);
+        stroke-dasharray: 74 452;
+        stroke-dashoffset: -322;
+      }
+
+      .chart-value {
+        fill: #fffaf6;
+        font-size: 2.2rem;
+        font-weight: 800;
+      }
+
+      .chart-label {
+        fill: rgba(255, 250, 246, 0.72);
+        font-size: 0.8rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .profit-data {
+        display: grid;
+        gap: 14px;
+      }
+
+      .profit-data span,
+      .profit-legend span {
+        color: rgba(255, 250, 246, 0.74);
+        font-size: 0.92rem;
+      }
+
+      .profit-data strong {
+        display: block;
+        margin-top: 6px;
+        font-size: 1.16rem;
+      }
+
+      .profit-legend {
+        grid-column: 1 / -1;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+
+      .dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        margin-right: 8px;
+        border-radius: 999px;
+      }
+
+      .dot-main { background: #fff5ea; }
+      .dot-soft { background: rgba(255, 240, 228, 0.66); }
+      .dot-fade { background: rgba(255, 240, 228, 0.36); }
+
+      .product-gallery {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 22px;
+      }
+
+      .product-tile {
+        min-height: 126px;
+        border-radius: 22px;
+        border: 1px solid var(--line);
+        background:
+          linear-gradient(180deg, rgba(252, 249, 245, 0.95), rgba(237, 228, 218, 0.95));
+        color: var(--muted);
+        display: flex;
+        align-items: end;
+        justify-content: start;
+        padding: 18px;
+        font-weight: 700;
+      }
+
+      .product-tile-large,
+      .product-tile.wide {
+        grid-column: span 2;
+      }
+
+      .product-tile.soft {
+        background: linear-gradient(180deg, rgba(241, 234, 225, 0.94), rgba(231, 221, 210, 0.94));
+      }
+
+      .product-tag,
+      .product-mark {
+        display: block;
+      }
+
+      .notion-showcase {
+        display: grid;
+        gap: 18px;
+      }
+
+      .notion-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+      }
+
+      .notion-title {
+        font-family: "Georgia", serif;
+        font-size: 1.42rem;
+      }
+
+      .notion-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .notion-chip,
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 32px;
+        padding: 0 12px;
+        border-radius: 999px;
+        font-size: 0.84rem;
+        font-weight: 700;
+      }
+
+      .notion-chip {
+        background: rgba(236, 228, 218, 0.85);
+        color: var(--accent-deep);
+      }
+
+      .tag.done {
+        background: rgba(211, 226, 214, 0.92);
+        color: #4d6a54;
+      }
+
+      .tag.progress {
+        background: rgba(228, 217, 206, 0.92);
+        color: #80624b;
+      }
+
+      .tag.soft {
+        background: rgba(240, 234, 227, 0.92);
+        color: var(--muted);
+      }
+
+      .notion-card {
+        display: grid;
+        gap: 10px;
+      }
+
+      .notion-row {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr 1fr 0.9fr;
+        gap: 12px;
+        align-items: center;
+        padding: 14px 16px;
+        border-radius: 16px;
+        background: rgba(255, 252, 248, 0.8);
+      }
+
+      .notion-head {
+        color: var(--muted-soft);
+        font-size: 0.82rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .catalog-note {
+        background: rgba(251, 247, 242, 0.92);
+      }
+
+      .compare-grid,
+      .process-grid,
+      .proof-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .compare-before {
+        background: rgba(251, 247, 242, 0.94);
+      }
+
+      .compare-after {
+        background: rgba(244, 236, 227, 0.95);
+      }
+
+      .compare-card ul {
+        margin: 0;
+        padding-left: 1.25rem;
+      }
+
+      .compare-card li + li {
+        margin-top: 10px;
+      }
+
+      .proof-card,
+      .process-card {
+        display: grid;
+        gap: 14px;
+      }
+
+      .process-step {
+        color: var(--muted-soft);
+        font-size: 0.8rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        font-weight: 700;
+      }
+
+      .cta-section {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+        gap: 20px;
+      }
+
+      .cta-panel {
+        display: grid;
+        gap: 14px;
+        align-content: start;
+      }
+
+      .contact-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .reveal {
+        opacity: 0;
+        transform: translateY(24px);
+        transition: opacity 600ms ease, transform 600ms ease;
+      }
+
+      .reveal.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      @media (max-width: 1100px) {
+        .hero,
+        .cta-section,
+        .story-grid,
+        .service-grid,
+        .case-grid,
+        .compare-grid,
+        .process-grid,
+        .proof-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .profit-widget {
+          grid-template-columns: 1fr;
+        }
+
+        .notion-row {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .page-shell {
+          width: min(100vw - 18px, 100%);
+          margin: 10px auto 24px;
+          padding: 14px;
+          border-radius: 28px;
+        }
+
+        .site-header {
+          top: 10px;
+          padding: 14px 16px;
+          border-radius: 24px;
+        }
+
+        .nav-toggle {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .site-nav {
+          position: absolute;
+          left: 14px;
+          right: 14px;
+          top: calc(100% + 10px);
+          display: none;
+          flex-direction: column;
+          align-items: start;
+          gap: 14px;
+          padding: 18px;
+          border-radius: 20px;
+          border: 1px solid rgba(255, 255, 255, 0.65);
+          background: rgba(255, 251, 246, 0.96);
+          box-shadow: 0 14px 34px rgba(115, 91, 72, 0.12);
+        }
+
+        .site-header.nav-open .site-nav {
+          display: flex;
+        }
+
+        .hero,
+        .system-section,
+        .case-section,
+        .compare-section,
+        .process-section,
+        .proof-section,
+        .cta-section {
+          padding: 24px;
+        }
+
+        h1 {
+          max-width: none;
+          font-size: clamp(2.5rem, 10vw, 3.6rem);
+        }
+
+        .hero-actions,
+        .audience-strip {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-actions {
+          display: grid;
+        }
+
+        .button {
+          width: 100%;
+        }
+
+        .product-tile-large,
+        .product-tile.wide {
+          grid-column: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-shell">
+      <div class="ambient ambient-a"></div>
+      <div class="ambient ambient-b"></div>
+      <div class="ambient ambient-c"></div>
+
+      <header class="site-header">
+        <a class="brand" href="#top">Tiff'stdio</a>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+        <nav class="site-nav" id="site-nav">
+          <a href="#offer">品牌定位</a>
+          <a href="#system">方案架構</a>
+          <a href="#cases">首頁規劃</a>
+          <a href="#contact">聯絡方式</a>
+        </nav>
+      </header>
+
+      <main id="top">
+        <section class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow">System Design For Sellers</p>
+            <h1>讓系統替你工作，接單不用再靠記憶硬撐。</h1>
+            <p class="hero-text">
+              如果你的訂單散在 IG、LINE、記事本、Excel，付款通知和出貨提醒還要一個一個手動回，
+              這裡做的不是雜亂模板，而是把流程、Notion 系統、n8n 自動化整理成能真正運作的後台。
+            </p>
+
+            <div class="hero-actions">
+              <a class="button button-primary" href="https://payhip.com/" target="_blank" rel="noreferrer">View Service Bundles</a>
+              <a class="button button-secondary" href="mailto:yxiao852@gmail.com?subject=Service%20Consultation">Book A Chat First</a>
+            </div>
+
+            <div class="audience-strip">
+              <article class="audience-card is-active">
+                <span class="audience-kicker">Pain Point</span>
+                <strong>接單很多，但後台永遠追著你跑</strong>
+                <span>訂單、付款、客製備註、出貨進度分散在不同地方，每次都靠自己補記和重複確認。</span>
+              </article>
+              <article class="audience-card">
+                <span class="audience-kicker">Outcome</span>
+                <strong>把混亂變成一套安靜、清楚、可交付的流程</strong>
+                <span>你會知道客人在哪一階段、哪張單要先處理、哪一封通知可以交給系統。</span>
+              </article>
+            </div>
+          </div>
+
+          <aside class="hero-panel">
+            <div class="panel-stat">
+              <span>Brand</span>
+              <strong>Tiff'stdio</strong>
+            </div>
+            <div class="panel-stat">
+              <span>Focus</span>
+              <strong>OS + Notion + n8n</strong>
+            </div>
+            <div class="panel-stat">
+              <span>Positioning</span>
+              <strong>資管邏輯 × 設計美感的自動化後台服務</strong>
+            </div>
+          </aside>
+        </section>
+
+        <section class="story-grid" id="offer">
+          <article class="story-card">
+            <p class="section-tag">Brand Direction</p>
+            <h2>不是賣一堆模板，而是替你整理出能長期使用的工作流。</h2>
+            <p>
+              視覺維持低飽和奶茶色與乾淨層級，內容則直接對準賣家的核心痛點。
+              看起來要冷靜、有質感，用起來也要真的減少混亂。
+            </p>
+          </article>
+
+          <article class="story-card">
+            <p class="section-tag">Pain Driven</p>
+            <h3>你不缺工具，你缺的是一套不會每天重來一次的整理方式。</h3>
+            <p>
+              很多賣家已經有表單、有試算表、有聊天紀錄，但工具沒有被接成流程，
+              最後每次開團、預購、出貨都像重新開始。
+            </p>
+          </article>
+
+          <article class="story-card accent-card">
+            <p class="section-tag">Expert Position</p>
+            <h3>資管背景的邏輯，配上品牌首頁該有的美感與節奏。</h3>
+            <p>
+              這裡提供的是兼顧美觀與可操作性的系統設定，
+              不是只把畫面做漂亮，而是讓你真的知道下一步該做什麼。
+            </p>
+          </article>
+        </section>
+
+        <section class="system-section" id="system">
+          <div class="section-heading">
+            <p class="section-tag">Main Bundles</p>
+            <h2>先用固定組合成交，再用加購擴充，客人更好理解也更好下單。</h2>
+          </div>
+
+          <div class="service-grid">
+            <article class="service-card">
+              <span class="service-index">01</span>
+              <h3>Starter</h3>
+              <p>OS + Notion。先把接單流程、欄位結構與基礎系統整理起來，適合剛開始整頓後台的人。</p>
+            </article>
+
+            <article class="service-card">
+              <span class="service-index">02</span>
+              <h3>Growth</h3>
+              <p>Notion + n8n。把管理系統和通知流程接起來，減少手動回覆與重複寄送。</p>
+            </article>
+
+            <article class="service-card">
+              <span class="service-index">03</span>
+              <h3>Full Setup</h3>
+              <p>OS + Notion + n8n。從流程、系統到自動化一起整理，適合想一次建好工作流的人。</p>
+            </article>
+
+            <article class="service-card">
+              <span class="service-index">04</span>
+              <h3>Add-ons</h3>
+              <p>Custom Integration 與 Tutorial Pack 可另外加購，讓主商品保持清楚，也保留客製彈性。</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="case-section" id="cases">
+          <div class="section-heading">
+            <p class="section-tag">Storefront Home</p>
+            <h2>首頁不是只放商品，而是先讓客人一眼知道你在解決什麼痛點。</h2>
+          </div>
+
+          <div class="catalog-frame">
+            <div class="case-grid">
+              <article class="case-card case-card-featured">
+                <p class="case-label">Banner 01</p>
+                <h3>品牌精神要先站穩：讓系統為你工作，找回生活的餘裕。</h3>
+                <p>
+                  這一區要像店鋪看板一樣，直接說出你的價值主張。
+                  不是單純做模板，而是幫賣家把接單、通知、出貨與資料流整理成能用的系統。
+                </p>
+
+                <div class="profit-widget">
+                  <div class="profit-chart-shell">
+                    <svg class="profit-chart" viewBox="0 0 220 220" aria-label="Bundle structure">
+                      <circle class="chart-track" cx="110" cy="110" r="72"></circle>
+                      <circle class="chart-segment chart-profit" cx="110" cy="110" r="72"></circle>
+                      <circle class="chart-segment chart-cost" cx="110" cy="110" r="72"></circle>
+                      <circle class="chart-segment chart-ops" cx="110" cy="110" r="72"></circle>
+                      <text x="110" y="102" text-anchor="middle" class="chart-value">3</text>
+                      <text x="110" y="126" text-anchor="middle" class="chart-label">Core Phases</text>
+                    </svg>
+                  </div>
+
+                  <div class="profit-data">
+                    <div>
+                      <span>OS</span>
+                      <strong>Planning</strong>
+                    </div>
+                    <div>
+                      <span>Notion</span>
+                      <strong>System</strong>
+                    </div>
+                    <div>
+                      <span>n8n</span>
+                      <strong>Automation</strong>
+                    </div>
+                  </div>
+
+                  <div class="profit-legend">
+                    <span><i class="dot dot-main"></i> Fixed bundles first</span>
+                    <span><i class="dot dot-soft"></i> Add-ons second</span>
+                    <span><i class="dot dot-fade"></i> Clear buyer journey</span>
+                  </div>
+                </div>
+              </article>
+
+              <article class="case-card">
+                <p class="case-label">Banner 02</p>
+                <h3>方案比較要清楚，不要讓客人一開始就選到頭痛。</h3>
+                <p>
+                  用乾淨表格講明 Starter、Growth、Full Setup 差在哪裡。
+                  客人先選階段，再決定要不要加購客製串接或教學包，成交會更順。
+                </p>
+
+                <div class="product-gallery">
+                  <div class="product-tile product-tile-large">
+                    <span class="product-tag">Starter</span>
+                    <span class="product-mark">OS + Notion</span>
+                  </div>
+                  <div class="product-tile">Growth</div>
+                  <div class="product-tile soft">Notion + n8n</div>
+                  <div class="product-tile wide">Full Setup | OS + Notion + n8n</div>
+                </div>
+              </article>
+            </div>
+
+            <div class="notion-showcase">
+              <div class="notion-header">
+                <div>
+                  <p class="section-tag">Plan Match</p>
+                  <div class="notion-title">Starter / Growth / Full Setup</div>
+                </div>
+                <div class="notion-actions">
+                  <span class="notion-chip">Starter</span>
+                  <span class="notion-chip">Growth</span>
+                  <span class="notion-chip">Full Setup</span>
+                </div>
+              </div>
+
+              <div class="notion-card">
+                <div class="notion-row notion-head">
+                  <span>Plan</span>
+                  <span>Includes</span>
+                  <span>Best For</span>
+                  <span>Action</span>
+                </div>
+                <div class="notion-row">
+                  <span>Starter</span>
+                  <span class="tag done">OS + Notion</span>
+                  <span>剛開始整理後台</span>
+                  <span>先收流程</span>
+                </div>
+                <div class="notion-row">
+                  <span>Growth</span>
+                  <span class="tag progress">Notion + n8n</span>
+                  <span>想省回覆時間</span>
+                  <span>接上通知</span>
+                </div>
+                <div class="notion-row">
+                  <span>Full Setup</span>
+                  <span class="tag progress">OS + Notion + n8n</span>
+                  <span>想一次整理到位</span>
+                  <span>完整建置</span>
+                </div>
+                <div class="notion-row">
+                  <span>Custom Integration</span>
+                  <span class="tag soft">Add-on</span>
+                  <span>有特殊需求</span>
+                  <span>另外加購</span>
+                </div>
+                <div class="notion-row">
+                  <span>Tutorial Pack</span>
+                  <span class="tag done">Add-on</span>
+                  <span>想自己會改</span>
+                  <span>附教學包</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="catalog-note">
+              <p>
+                專業首頁不該只是堆商品，而是先幫客人快速定位自己目前在哪一階段。
+                <strong>越清楚的層級，越能降低諮詢成本，也越容易讓服務型商品成交。</strong>
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="compare-section">
+          <div class="section-heading">
+            <p class="section-tag">Service Flow</p>
+            <h2>服務流程要寫清楚，這本身就是信任感的一部分。</h2>
+          </div>
+
+          <div class="compare-grid">
+            <article class="compare-card compare-before">
+              <h3>客人最怕的事</h3>
+              <ul>
+                <li>不知道下單後要提供什麼資料。</li>
+                <li>不知道你賣的是模板、服務，還是完全客製。</li>
+                <li>不知道修改範圍、交付方式和完成後能不能自己用。</li>
+              </ul>
+            </article>
+
+            <article class="compare-card compare-after">
+              <h3>首頁要直接講清楚</h3>
+              <ul>
+                <li>聊聊諮詢 → 需求確認 → 下單付款 → 系統交付。</li>
+                <li>本賣場採預約制，下單前請先確認需求與平台。</li>
+                <li>固定組合先成交，額外串接與教學再另外加購。</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="process-section">
+          <div class="section-heading">
+            <p class="section-tag">Store Sections</p>
+            <h2>首頁分類要像專業店鋪，而不是把所有東西丟成一排。</h2>
+          </div>
+
+          <div class="process-grid">
+            <article class="process-card">
+              <span class="process-step">01</span>
+              <h3>熱門組合</h3>
+              <p>Starter、Growth、Full Setup 放在第一層，讓第一次看到你的客人不用猜要從哪個開始。</p>
+            </article>
+            <article class="process-card">
+              <span class="process-step">02</span>
+              <h3>進階擴充</h3>
+              <p>Custom Integration、Extra Revision、更多通知模組放在第二層，只給有需要的人加購。</p>
+            </article>
+            <article class="process-card">
+              <span class="process-step">03</span>
+              <h3>新手教學</h3>
+              <p>Tutorial Pack 可以用 Canva 做成操作教學，降低客人不會用的焦慮，也減少售後重複回答。</p>
+            </article>
+            <article class="process-card">
+              <span class="process-step">04</span>
+              <h3>成功案例</h3>
+              <p>首頁放一張系統畫面或流程截圖，讓無形服務變得有形，也更像真正的品牌店鋪。</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="proof-section">
+          <div class="section-heading">
+            <p class="section-tag">Trust Details</p>
+            <h2>服務型商品的專業感，來自每一個小細節都講得清楚。</h2>
+          </div>
+
+          <div class="proof-grid">
+            <article class="proof-card">
+              <h3>聊聊自動回覆</h3>
+              <p>您好，我是 Tiff'stdio，專門提供系統整理與自動化建置服務。請先告訴我目前遇到的痛點，以及你主要使用的平台，我會再幫你判斷適合哪一套方案。</p>
+            </article>
+            <article class="proof-card">
+              <h3>專業警示</h3>
+              <p>首頁與賣場都要明確寫出：本賣場採預約制，下單前請務必聊聊確認需求。這不是麻煩，而是品質控管的一部分。</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="cta-section" id="contact">
+          <div class="cta-copy">
+            <p class="section-tag">Shop Intro</p>
+            <h2>手動處理訂單太累了嗎？把重複工作交給系統，你可以把心力留給產品和客人。</h2>
+            <p>
+              這裡提供的是服務型建置與系統整理，不是大量複製的雜亂模板。
+              我會用資管邏輯與設計感一起整理後台，所以在開始前會先聊聊確認需求，確保交付品質。
+            </p>
+          </div>
+
+          <div class="cta-panel">
+            <a class="button button-primary button-wide" href="mailto:yxiao852@gmail.com?subject=Starter%20Consultation">聊聊確認需求</a>
+            <a class="button button-secondary button-wide" href="https://payhip.com/" target="_blank" rel="noreferrer">查看目前商品頁</a>
+            <div class="contact-list">
+              <p><strong>Brand</strong> Tiff'stdio</p>
+              <p><strong>Contact</strong> 0966-332-830</p>
+              <p><strong>Reminder</strong> 本賣場採預約制，下單前請先提供痛點、使用平台與希望整理的流程。</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>
